@@ -1,0 +1,30 @@
+metrics_to_run:
+  - custom_response_quality
+  - weather_grounding_check
+
+# Fail `agents-cli eval run` (exit 1) when a metric's mean score drops below
+# its threshold.
+thresholds:
+  custom_response_quality: 3.5
+
+custom_metrics:
+  # Local LLM-as-judge (see response_quality.py). Runs in-process via
+  # google-genai on Gemini platform (ADC) or Google AI Studio (GEMINI_API_KEY).
+  - name: custom_response_quality
+    custom_function_file: response_quality.py
+  - name: weather_grounding_check
+    custom_function: |
+      def evaluate(instance):
+          response = (instance.get("response") or "").lower()
+          has_cities = any(
+              c in response for c in ("mexico city", "são paulo", "sao paulo", "new york")
+          )
+          has_safety_or_policy = any(
+              k in response for k in ("365", "past year", "cannot bypass", "confirm")
+          )
+          return {"score": 1.0 if (has_cities or has_safety_or_policy) else 0.0}
+  - name: agent_turn_count
+    custom_function: |
+      def evaluate(instance):
+          turns = (instance.get("agent_data") or {}).get("turns", [])
+          return {"score": len(turns)}
